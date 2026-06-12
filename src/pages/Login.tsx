@@ -1,20 +1,45 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { login as loginService } from '../api/authService';
+import { useAuth } from '../context/AuthContext';
 
 const Login: React.FC = () => {
   const [showPassword, setShowPassword] = useState(false);
+  const [errorMsg, setErrorMsg] = useState('');
+  const [loading, setLoading] = useState(false);
+  
   const navigate = useNavigate();
+  const { login } = useAuth();
 
   const handleTogglePassword = () => {
     setShowPassword(!showPassword);
   };
 
-  const handleLogin = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
+    setErrorMsg('');
+
     if (form.checkValidity()) {
-      // Simulate successful login
-      navigate('/dashboard');
+      const formData = new FormData(form);
+      const usuario = formData.get('usuario') as string;
+      const contrasena = formData.get('contrasena') as string;
+
+      setLoading(true);
+      try {
+        const userData = await loginService(usuario, contrasena);
+        login(userData);
+        navigate('/dashboard');
+      } catch (error: any) {
+        console.error(error);
+        if (error.response && error.response.status === 401) {
+          setErrorMsg('Usuario o contraseña incorrectos.');
+        } else {
+          setErrorMsg('Ocurrió un error al intentar iniciar sesión.');
+        }
+      } finally {
+        setLoading(false);
+      }
     } else {
       form.classList.add('was-validated');
     }
@@ -75,9 +100,20 @@ const Login: React.FC = () => {
               </div>
             </div>
 
+            {errorMsg && (
+              <div className="alert alert-danger py-2 small" role="alert">
+                {errorMsg}
+              </div>
+            )}
+
             <div className="d-grid">
-              <button type="submit" className="btn btn-primary fw-semibold py-2" id="btnIngresar">
-                <i className="bi bi-box-arrow-in-right me-2"></i>Ingresar
+              <button type="submit" className="btn btn-primary fw-semibold py-2" id="btnIngresar" disabled={loading}>
+                {loading ? (
+                  <span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>
+                ) : (
+                  <i className="bi bi-box-arrow-in-right me-2"></i>
+                )}
+                Ingresar
               </button>
             </div>
           </form>

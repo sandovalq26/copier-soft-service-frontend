@@ -1,22 +1,56 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getDashboardStats } from '../api/dashboardService';
+import type { DashboardStatsDTO } from '../api/dashboardService';
 
 const Dashboard: React.FC = () => {
-  const today = "10 de junio de 2026"; // Mock
-  const totalEmpleados = 5;
-  const totalClientes = 120;
-  const totalFotocopiadoras = 45;
-  const alquileresActivos = 18;
+  const [stats, setStats] = useState<DashboardStatsDTO | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
 
-  const alquileresRecientes = [
-    { id: 'AQ0001', cliente: 'Perez, Juan', inicio: '2026-06-01', fin: '2026-06-30', estado: 'EN EJECUCION', precio: '150.00' },
-    { id: 'AQ0002', cliente: 'Gomez, Maria', inicio: '2026-05-15', fin: '2026-06-15', estado: 'FINALIZADO', precio: '200.00' }
-  ];
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const data = await getDashboardStats();
+        setStats(data);
+      } catch (err) {
+        console.error('Error fetching dashboard stats', err);
+        setError('No se pudieron cargar las estadísticas del dashboard.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchStats();
+  }, []);
 
-  const pagosRecientes = [
-    { cliente: 'Perez, Juan', monto: '150.00', medio: 'YAPE' },
-    { cliente: 'Gomez, Maria', monto: '200.00', medio: 'EFECTIVO' }
-  ];
+  const today = new Date().toLocaleDateString('es-PE', { day: 'numeric', month: 'long', year: 'numeric' });
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+    );
+  }
+
+  if (error || !stats) {
+    return (
+      <div className="alert alert-danger" role="alert">
+        {error || 'Error al cargar datos.'}
+      </div>
+    );
+  }
+
+  const {
+    totalEmpleados,
+    totalClientes,
+    totalFotocopiadoras,
+    alquileresActivos,
+    alquileresRecientes,
+    pagosRecientes
+  } = stats;
 
   return (
     <>
@@ -104,10 +138,10 @@ const Dashboard: React.FC = () => {
                 <tbody>
                   {alquileresRecientes.map((item, index) => (
                     <tr key={index}>
-                      <td className="text-muted fw-medium">{item.id}</td>
-                      <td>{item.cliente}</td>
-                      <td>{item.inicio}</td>
-                      <td>{item.fin}</td>
+                      <td className="text-muted fw-medium">{item.codAlquiler}</td>
+                      <td>{item.clienteApellidos}, {item.clienteNombres}</td>
+                      <td>{item.fechaInicio}</td>
+                      <td>{item.fechaFin}</td>
                       <td>
                         <span className={`badge ${item.estado === 'FINALIZADO' ? 'bg-success-subtle text-success' : 'bg-primary-subtle text-primary'} fw-semibold`}>
                           {item.estado}
@@ -142,9 +176,9 @@ const Dashboard: React.FC = () => {
                 <tbody>
                   {pagosRecientes.map((pago, index) => (
                     <tr key={index}>
-                      <td>{pago.cliente}</td>
-                      <td className="text-end">S/ {pago.monto}</td>
-                      <td><span className="badge bg-success-subtle text-success fw-semibold">{pago.medio}</span></td>
+                      <td>{pago.clienteApellidos}, {pago.clienteNombres}</td>
+                      <td className="text-end">S/ {pago.importeTotal}</td>
+                      <td><span className="badge bg-success-subtle text-success fw-semibold">{pago.medioPagoNombre}</span></td>
                     </tr>
                   ))}
                 </tbody>
