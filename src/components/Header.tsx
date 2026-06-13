@@ -1,15 +1,26 @@
 import React from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 const Header: React.FC = () => {
   const navigate = useNavigate();
-  const userName = "Usuario"; // Mock
-  const userRole = "Administrador"; // Mock
-  const userInitials = "US"; // Mock
+  const { user, logout } = useAuth();
+
+  const userName = user ? `${user.nombres} ${user.apellidos}` : "Usuario";
+  const userRole = user ? user.cargo : "Administrador";
+
+  // Calculate initials (e.g., "Juan Perez" -> "JP")
+  const getInitials = () => {
+    if (!user) return "US";
+    const firstInitial = user.nombres ? user.nombres.charAt(0) : "";
+    const lastInitial = user.apellidos ? user.apellidos.charAt(0) : "";
+    return `${firstInitial}${lastInitial}`.toUpperCase();
+  };
+  const userInitials = getInitials();
 
   const handleLogout = (e: React.MouseEvent) => {
     e.preventDefault();
-    // Simulate logout logic
+    logout();
     navigate('/login');
   };
 
