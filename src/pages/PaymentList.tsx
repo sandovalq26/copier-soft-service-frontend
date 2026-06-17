@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getAllPayments, PagoDTO } from '../api/paymentService';
+import { getAllPayments } from '../api/paymentService';
+import type { PagoDTO } from '../api/paymentService';
 
 const PaymentList: React.FC = () => {
   const [payments, setPayments] = useState<PagoDTO[]>([]);
@@ -29,9 +30,6 @@ const PaymentList: React.FC = () => {
           <p className="page-description">Registro y seguimiento de pagos de alquileres</p>
         </div>
         <div>
-          <button className="btn btn-secondary me-2" id="btnDescargarPagos">
-            <i className="bi bi-cloud-download-fill me-1"></i>Descargar reporte
-          </button>
           <Link to="/payments/new" className="btn btn-primary" id="btnNuevoPago">
             <i className="bi bi-plus-lg me-1"></i>Registrar Pago
           </Link>

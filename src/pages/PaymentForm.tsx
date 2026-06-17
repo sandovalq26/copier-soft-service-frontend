@@ -1,9 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { createPayment, PagoDTO } from '../api/paymentService';
-import { getReceiptTypes, TipoComprobanteDTO } from '../api/receiptTypeService';
-import { getPaymentMethods, MedioPagoDTO } from '../api/paymentMethodService';
-import { getActiveRentals, AlquilerDropdownDTO } from '../api/rentalService';
+import { createPayment } from '../api/paymentService';
+import type { PagoDTO } from '../api/paymentService';
+import { getReceiptTypes } from '../api/receiptTypeService';
+import type { TipoComprobanteDTO } from '../api/receiptTypeService';
+import { getPaymentMethods } from '../api/paymentMethodService';
+import type { MedioPagoDTO } from '../api/paymentMethodService';
+import { getActiveRentals } from '../api/rentalService';
+import type { AlquilerDropdownDTO } from '../api/rentalService';
 
 const PaymentForm: React.FC = () => {
   const navigate = useNavigate();
@@ -12,9 +16,9 @@ const PaymentForm: React.FC = () => {
   const [receiptTypes, setReceiptTypes] = useState<TipoComprobanteDTO[]>([]);
   const [paymentMethods, setPaymentMethods] = useState<MedioPagoDTO[]>([]);
   
-  const [subTotal, setSubTotal] = useState<number>(0);
-  const [descuento, setDescuento] = useState<number>(0);
-  const [igv, setIgv] = useState<number>(0);
+  const [subTotal, setSubTotal] = useState<string | number>('');
+  const [descuento, setDescuento] = useState<string | number>('');
+  const [igv, setIgv] = useState<string | number>('');
   const [total, setTotal] = useState<number>(0);
 
   const [saving, setSaving] = useState<boolean>(false);
@@ -39,7 +43,10 @@ const PaymentForm: React.FC = () => {
   }, []);
 
   useEffect(() => {
-    const t = subTotal - descuento + igv;
+    const s = Number(subTotal) || 0;
+    const d = Number(descuento) || 0;
+    const i = Number(igv) || 0;
+    const t = s - d + i;
     setTotal(t > 0 ? t : 0);
   }, [subTotal, descuento, igv]);
 
@@ -196,7 +203,7 @@ const PaymentForm: React.FC = () => {
                       <span className="input-group-text">S/</span>
                       <input type="number" className="form-control" id="paySubTotal" name="subTotal"
                              placeholder="0.00" min="0" step="0.01" required
-                             value={subTotal === 0 ? '' : subTotal} onChange={(e) => setSubTotal(parseFloat(e.target.value) || 0)} />
+                             value={subTotal} onChange={(e) => setSubTotal(e.target.value)} />
                     </div>
                   </div>
                   <div className="col-12 col-md-3">
@@ -207,7 +214,7 @@ const PaymentForm: React.FC = () => {
                       <span className="input-group-text">S/</span>
                       <input type="number" className="form-control" id="payDesc" name="descuento"
                              placeholder="0.00" min="0" step="0.01" required
-                             value={descuento === 0 ? '' : descuento} onChange={(e) => setDescuento(parseFloat(e.target.value) || 0)} />
+                             value={descuento} onChange={(e) => setDescuento(e.target.value)} />
                     </div>
                   </div>
                   <div className="col-12 col-md-3">
@@ -218,7 +225,7 @@ const PaymentForm: React.FC = () => {
                       <span className="input-group-text">S/</span>
                       <input type="number" className="form-control" id="payIGV" name="igv"
                              placeholder="0.00" min="0" step="0.01" required
-                             value={igv === 0 ? '' : igv} onChange={(e) => setIgv(parseFloat(e.target.value) || 0)} />
+                             value={igv} onChange={(e) => setIgv(e.target.value)} />
                     </div>
                   </div>
                   <div className="col-12 col-md-3">
