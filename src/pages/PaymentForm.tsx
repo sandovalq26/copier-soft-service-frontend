@@ -1,26 +1,83 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { createPayment, PagoDTO } from '../api/paymentService';
+import { getReceiptTypes, TipoComprobanteDTO } from '../api/receiptTypeService';
+import { getPaymentMethods, MedioPagoDTO } from '../api/paymentMethodService';
+import { getActiveRentals, AlquilerDropdownDTO } from '../api/rentalService';
 
 const PaymentForm: React.FC = () => {
   const navigate = useNavigate();
 
+  const [rentals, setRentals] = useState<AlquilerDropdownDTO[]>([]);
+  const [receiptTypes, setReceiptTypes] = useState<TipoComprobanteDTO[]>([]);
+  const [paymentMethods, setPaymentMethods] = useState<MedioPagoDTO[]>([]);
+  
   const [subTotal, setSubTotal] = useState<number>(0);
   const [descuento, setDescuento] = useState<number>(0);
   const [igv, setIgv] = useState<number>(0);
   const [total, setTotal] = useState<number>(0);
+
+  const [saving, setSaving] = useState<boolean>(false);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchCombos = async () => {
+      try {
+        const [rentalsData, receiptData, methodsData] = await Promise.all([
+          getActiveRentals(),
+          getReceiptTypes(),
+          getPaymentMethods()
+        ]);
+        setRentals(rentalsData);
+        setReceiptTypes(receiptData);
+        setPaymentMethods(methodsData);
+      } catch (err: any) {
+        setError(err.response?.data?.message || 'Error al cargar los datos del formulario.');
+      }
+    };
+    fetchCombos();
+  }, []);
 
   useEffect(() => {
     const t = subTotal - descuento + igv;
     setTotal(t > 0 ? t : 0);
   }, [subTotal, descuento, igv]);
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
-    if (form.checkValidity()) {
-      navigate('/payments');
-    } else {
+    
+    if (!form.checkValidity()) {
       form.classList.add('was-validated');
+      return;
+    }
+
+    setSaving(true);
+    setError(null);
+    
+    const formData = new FormData(form);
+    
+    const dto: PagoDTO = {
+      tipoPago: formData.get('paymentType') as string,
+      codAlquiler: formData.get('alquilerId') as string,
+      codTipoComprobante: formData.get('TipoComprobante') as string,
+      numeroComprobante: formData.get('NumeroComprobante') as string,
+      formaPago: formData.get('FormaPago') as string,
+      codMedioPago: formData.get('medioPago') as string,
+      fechaEmision: formData.get('fechaPago') as string,
+      subTotal: Number(formData.get('subTotal')),
+      descuento: Number(formData.get('descuento')),
+      igv: Number(formData.get('igv')),
+      importeTotal: total,
+      pagoCompleto: formData.get('pagoCompleto') === 'SI'
+    };
+
+    try {
+      await createPayment(dto);
+      navigate('/payments');
+    } catch (err: any) {
+      setError(err.response?.data?.message || 'Error al guardar el pago.');
+      setSaving(false);
     }
   };
 
@@ -35,6 +92,14 @@ const PaymentForm: React.FC = () => {
           <i className="bi bi-arrow-left me-1"></i>Volver
         </Link>
       </div>
+
+      {error && (
+        <div className="alert alert-danger alert-dismissible fade show d-flex align-items-center gap-2 mb-3" role="alert">
+          <i className="bi bi-exclamation-triangle-fill"></i>
+          <span>{error}</span>
+          <button type="button" className="btn-close ms-auto" onClick={() => setError(null)}></button>
+        </div>
+      )}
 
       <form id="paymentForm" onSubmit={handleSubmit} noValidate>
         <div className="row g-3">
@@ -60,7 +125,11 @@ const PaymentForm: React.FC = () => {
                     </label>
                     <select className="form-select" id="payAlquiler" name="alquilerId" required defaultValue="">
                       <option value="" disabled>-- Seleccionar alquiler --</option>
-                      <option value="AQ001">AQ001 — Carlos Lopez (S/ 150.00)</option>
+                      {rentals.map(r => (
+                        <option key={r.codAlquiler} value={r.codAlquiler}>
+                          {r.codAlquiler} — {r.clienteNombres} (S/ {r.precio.toFixed(2)})
+                        </option>
+                      ))}
                     </select>
                     <div className="invalid-feedback">Selecciona un alquiler.</div>
                   </div>
@@ -70,8 +139,11 @@ const PaymentForm: React.FC = () => {
                     </label>
                     <select className="form-select" id="payTipoComp" name="TipoComprobante" required defaultValue="">
                       <option value="" disabled>-- Seleccionar --</option>
-                      <option value="1">FACTURA</option>
-                      <option value="2">BOLETA</option>
+                      {receiptTypes.map(rt => (
+                        <option key={rt.codTipoComprobante} value={rt.codTipoComprobante}>
+                          {rt.nombre}
+                        </option>
+                      ))}
                     </select>
                     <div className="invalid-feedback">Selecciona tipo de comprobante.</div>
                   </div>
@@ -99,9 +171,11 @@ const PaymentForm: React.FC = () => {
                     </label>
                     <select className="form-select" id="payMedio" name="medioPago" required defaultValue="">
                       <option value="" disabled>-- Seleccionar --</option>
-                      <option value="1">YAPE</option>
-                      <option value="2">PLIN</option>
-                      <option value="3">EFECTIVO</option>
+                      {paymentMethods.map(pm => (
+                        <option key={pm.codMedioPago} value={pm.codMedioPago}>
+                          {pm.nombre}
+                        </option>
+                      ))}
                     </select>
                     <div className="invalid-feedback">Selecciona un medio de pago.</div>
                   </div>
@@ -122,7 +196,7 @@ const PaymentForm: React.FC = () => {
                       <span className="input-group-text">S/</span>
                       <input type="number" className="form-control" id="paySubTotal" name="subTotal"
                              placeholder="0.00" min="0" step="0.01" required
-                             value={subTotal || ''} onChange={(e) => setSubTotal(parseFloat(e.target.value) || 0)} />
+                             value={subTotal === 0 ? '' : subTotal} onChange={(e) => setSubTotal(parseFloat(e.target.value) || 0)} />
                     </div>
                   </div>
                   <div className="col-12 col-md-3">
@@ -133,7 +207,7 @@ const PaymentForm: React.FC = () => {
                       <span className="input-group-text">S/</span>
                       <input type="number" className="form-control" id="payDesc" name="descuento"
                              placeholder="0.00" min="0" step="0.01" required
-                             value={descuento || ''} onChange={(e) => setDescuento(parseFloat(e.target.value) || 0)} />
+                             value={descuento === 0 ? '' : descuento} onChange={(e) => setDescuento(parseFloat(e.target.value) || 0)} />
                     </div>
                   </div>
                   <div className="col-12 col-md-3">
@@ -144,7 +218,7 @@ const PaymentForm: React.FC = () => {
                       <span className="input-group-text">S/</span>
                       <input type="number" className="form-control" id="payIGV" name="igv"
                              placeholder="0.00" min="0" step="0.01" required
-                             value={igv || ''} onChange={(e) => setIgv(parseFloat(e.target.value) || 0)} />
+                             value={igv === 0 ? '' : igv} onChange={(e) => setIgv(parseFloat(e.target.value) || 0)} />
                     </div>
                   </div>
                   <div className="col-12 col-md-3">
@@ -153,7 +227,7 @@ const PaymentForm: React.FC = () => {
                     </label>
                     <div className="input-group">
                       <span className="input-group-text">S/</span>
-                      <input type="number" className="form-control" id="payTotal" name="total"
+                      <input type="number" className="form-control bg-light" id="payTotal" name="total"
                              placeholder="0.00" readOnly value={total.toFixed(2)} />
                     </div>
                   </div>
@@ -174,8 +248,12 @@ const PaymentForm: React.FC = () => {
 
         <div className="d-flex gap-2 mt-3 justify-content-end">
           <Link to="/payments" className="btn btn-outline-secondary px-4">Cancelar</Link>
-          <button type="submit" className="btn btn-success px-4" id="btnGuardarPago">
-            <i className="bi bi-check-circle me-1"></i>Confirmar Pago
+          <button type="submit" className="btn btn-success px-4" id="btnGuardarPago" disabled={saving}>
+            {saving ? (
+              <><span className="spinner-border spinner-border-sm me-2" role="status" aria-hidden="true"></span>Guardando...</>
+            ) : (
+              <><i className="bi bi-check-circle me-1"></i>Confirmar Pago</>
+            )}
           </button>
         </div>
       </form>
