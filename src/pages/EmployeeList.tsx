@@ -1,12 +1,38 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getAllEmployees } from '../api/employeeService';
+import type { EmployeeDTO } from '../api/employeeService';
 
 const EmployeeList: React.FC = () => {
-  // Mock data for employees
-  const employees = [
-    { id: 'E0001', tipoDoc: 'DNI', numDoc: '12345678', nombres: 'Juan', apellidos: 'Perez', cargo: 'VENDEDOR', telefono: '987654321', email: 'juan@example.com' },
-    { id: 'E0002', tipoDoc: 'DNI', numDoc: '87654321', nombres: 'Maria', apellidos: 'Gomez', cargo: 'ADMINISTRADOR', telefono: '912345678', email: 'maria@example.com' }
-  ];
+  const [employees, setEmployees] = useState<EmployeeDTO[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    const fetchEmployees = async () => {
+      try {
+        const data = await getAllEmployees();
+        setEmployees(data);
+      } catch (err: any) {
+        console.error('Error fetching employees:', err);
+        setError('Ocurrió un error al intentar cargar los empleados.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchEmployees();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -19,6 +45,12 @@ const EmployeeList: React.FC = () => {
           <i className="bi bi-plus-lg me-1"></i>Nuevo Empleado
         </Link>
       </div>
+
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
+      )}
 
       <div className="table-card">
         <div className="table-card-header">
@@ -45,20 +77,17 @@ const EmployeeList: React.FC = () => {
                 </tr>
               ) : (
                 employees.map((emp) => (
-                  <tr key={emp.id}>
-                    <td className="text-muted fw-medium">{emp.id}</td>
-                    <td>{emp.tipoDoc}: {emp.numDoc}</td>
-                    <td>{emp.nombres} {emp.apellidos}</td>
+                  <tr key={emp.codEmpleado}>
+                    <td className="text-muted fw-medium">{emp.codEmpleado}</td>
+                    <td>{emp.tipoDocumento}: {emp.numeroDocumento}</td>
+                    <td><strong>{emp.nombres} {emp.apellidos}</strong></td>
                     <td><span className="badge bg-primary-subtle text-primary fw-semibold">{emp.cargo}</span></td>
                     <td>{emp.telefono || "-"}</td>
-                    <td>{emp.email || "-"}</td>
+                    <td>{emp.correo || "-"}</td>
                     <td className="text-center">
-                      <Link to={`/employees/edit/${emp.id}`} className="btn btn-sm btn-outline-primary me-1" title="Editar">
+                      <Link to={`/employees/edit/${emp.codEmpleado}`} className="btn btn-sm btn-outline-primary me-1" title="Editar">
                         <i className="bi bi-pencil"></i>
                       </Link>
-                      <button className="btn btn-sm btn-outline-danger btn-eliminar" title="Eliminar">
-                        <i className="bi bi-trash"></i>
-                      </button>
                     </td>
                   </tr>
                 ))
