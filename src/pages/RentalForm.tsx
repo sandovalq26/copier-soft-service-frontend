@@ -1,45 +1,117 @@
-import React, { useState } from 'react';
+// Erick_Alquileres
+import React, { useEffect, useState } from 'react';
 import { Link, useParams, useNavigate } from 'react-router-dom';
+import { getAllClients, ClienteDTO } from '../api/clientService';
+import { getAllPhotocopiers, FotocopiadoraDTO } from '../api/photocopierService';
+import { createRental, updateRental, getRentalById, CrearAlquilerDTO } from '../api/rentalService';
+import { useAuth } from '../context/AuthContext';
 
 const RentalForm: React.FC = () => {
   const { id } = useParams();
   const isEdit = !!id;
   const navigate = useNavigate();
+  const { user } = useAuth();
 
-  const formTitle = isEdit ? "Editar Alquiler" : "Nuevo Alquiler";
-  const formDesc = isEdit ? "Modifica los datos del contrato de alquiler" : "Registra un nuevo contrato de alquiler";
+  const formTitle = isEdit ? 'Editar Alquiler' : 'Nuevo Alquiler';
+  const formDesc = isEdit ? 'Modifica los datos del contrato de alquiler' : 'Registra un nuevo contrato de alquiler';
 
-  // Mock available photocopiers
-  const availablePhotocopiers = [
-    { id: 'F001', nombre: 'Impresora A', marca: 'Canon', modelo: 'X1', serie: 'SN123', anio: 2023, ancho: 50, alto: 60, fondo: 50 },
-    { id: 'F002', nombre: 'Impresora B', marca: 'Ricoh', modelo: 'R2', serie: 'SN456', anio: 2022, ancho: 60, alto: 70, fondo: 60 }
-  ];
-
-  const [selectedPhotos, setSelectedPhotos] = useState<any[]>([]);
+  const [clients, setClients] = useState<ClienteDTO[]>([]);
+  const [availablePhotocopiers, setAvailablePhotocopiers] = useState<FotocopiadoraDTO[]>([]);
+  const [selectedPhotos, setSelectedPhotos] = useState<FotocopiadoraDTO[]>([]);
   const [photoSelectId, setPhotoSelectId] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [clientData, photoData] = await Promise.all([
+          getAllClients(),
+          getAllPhotocopiers(),
+        ]);
+        setClients(clientData);
+        setAvailablePhotocopiers(photoData);
+
+        if (isEdit && id) {
+          const rental = await getRentalById(id);
+          const form = document.getElementById('rentalForm') as HTMLFormElement;
+          (form.elements.namedItem('clienteId') as HTMLSelectElement).value = rental.codCliente;
+          (form.elements.namedItem('fechaInicio') as HTMLInputElement).value = rental.fechaInicio;
+          (form.elements.namedItem('fechaFin') as HTMLInputElement).value = rental.fechaFin;
+          (form.elements.namedItem('periodo') as HTMLSelectElement).value = rental.periodo;
+          (form.elements.namedItem('cantidad') as HTMLInputElement).value = String(rental.valorPeriodo);
+          (form.elements.namedItem('price') as HTMLInputElement).value = String(rental.precio);
+          (form.elements.namedItem('estado') as HTMLSelectElement).value = rental.estado;
+          setSelectedPhotos(rental.fotocopiadoras);
+        }
+      } catch (err) {
+        console.error('Error cargando datos:', err);
+      } finally {
+        setLoading(false);
+      }
+    };
+    fetchData();
+  }, [isEdit, id]);
 
   const handleAddPhoto = () => {
     if (!photoSelectId) return;
-    const photo = availablePhotocopiers.find(p => p.id === photoSelectId);
-    if (photo && !selectedPhotos.find(p => p.id === photo.id)) {
+    const photo = availablePhotocopiers.find(p => p.codFotocopiadora === photoSelectId);
+    if (photo && !selectedPhotos.find(p => p.codFotocopiadora === photo.codFotocopiadora)) {
       setSelectedPhotos([...selectedPhotos, photo]);
     }
     setPhotoSelectId('');
   };
 
   const handleRemovePhoto = (photoId: string) => {
-    setSelectedPhotos(selectedPhotos.filter(p => p.id !== photoId));
+    setSelectedPhotos(selectedPhotos.filter(p => p.codFotocopiadora !== photoId));
   };
 
-  const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     const form = e.currentTarget;
-    if (form.checkValidity()) {
-      navigate('/rentals');
-    } else {
+    if (!form.checkValidity()) {
       form.classList.add('was-validated');
+      return;
+    }
+
+    if (!user) {
+      alert('Debes iniciar sesión para registrar un alquiler.');
+      return;
+    }
+
+    setSubmitting(true);
+    const formData = new FormData(form);
+
+    const dto: CrearAlquilerDTO = {
+      codEmpleado: user.codEmpleado,
+      codCliente: formData.get('clienteId') as string,
+      fechaInicio: formData.get('fechaInicio') as string,
+      fechaFin: formData.get('fechaFin') as string,
+      periodo: formData.get('periodo') as string,
+      valorPeriodo: Number(formData.get('cantidad')),
+      precio: Number(formData.get('price')),
+      estado: formData.get('estado') as string,
+      fotocopiadoras: selectedPhotos.map(p => p.codFotocopiadora),
+    };
+
+    try {
+      if (isEdit && id) {
+        await updateRental(id, dto);
+      } else {
+        await createRental(dto);
+      }
+      navigate('/rentals');
+    } catch (err) {
+      console.error('Error al guardar alquiler:', err);
+      alert('Ocurrió un error al guardar el alquiler.');
+    } finally {
+      setSubmitting(false);
     }
   };
+
+  if (loading) {
+    return <div className="text-center py-5"><div className="spinner-border" role="status"></div></div>;
+  }
 
   return (
     <>
@@ -68,8 +140,11 @@ const RentalForm: React.FC = () => {
                     </label>
                     <select className="form-select" id="rentCliente" name="clienteId" required defaultValue="">
                       <option value="" disabled>-- Seleccionar cliente --</option>
-                      <option value="C001">Lopez, Carlos (DNI: 11112222)</option>
-                      <option value="C002">Empresa SAC (RUC: 20123456789)</option>
+                      {clients.map(c => (
+                        <option key={c.codCliente} value={c.codCliente}>
+                          {c.apellidos}, {c.nombres} ({c.tipoDocumento}: {c.numeroDocumento})
+                        </option>
+                      ))}
                     </select>
                     <div className="invalid-feedback">Selecciona un cliente.</div>
                   </div>
@@ -149,16 +224,17 @@ const RentalForm: React.FC = () => {
                 <div className="row g-3 mb-4">
                   <div className="col-12 col-lg-6">
                     <div className="input-group">
-                      <select 
-                        className="form-select" 
-                        id="filterPhoto" 
+                      <select
+                        className="form-select"
+                        id="filterPhoto"
                         value={photoSelectId}
                         onChange={(e) => setPhotoSelectId(e.target.value)}
                       >
                         <option value="" disabled>-- Seleccionar fotocopiadora --</option>
                         {availablePhotocopiers.map(f => (
-                          <option key={f.id} value={f.id} disabled={!!selectedPhotos.find(p => p.id === f.id)}>
-                            {f.id} - {f.nombre} ({f.modelo})
+                          <option key={f.codFotocopiadora} value={f.codFotocopiadora}
+                            disabled={!!selectedPhotos.find(p => p.codFotocopiadora === f.codFotocopiadora)}>
+                            {f.codFotocopiadora} - {f.nombre} ({f.modelo})
                           </option>
                         ))}
                       </select>
@@ -178,7 +254,6 @@ const RentalForm: React.FC = () => {
                         <th>Marca</th>
                         <th>Modelo</th>
                         <th>N° Serie</th>
-                        <th>Año de Fabricación</th>
                         <th>Ancho (cm)</th>
                         <th>Alto (cm)</th>
                         <th>Fondo (cm)</th>
@@ -187,18 +262,17 @@ const RentalForm: React.FC = () => {
                     </thead>
                     <tbody>
                       {selectedPhotos.map(f => (
-                        <tr key={f.id}>
-                          <td className="text-muted fw-medium">{f.id}</td>
+                        <tr key={f.codFotocopiadora}>
+                          <td className="text-muted fw-medium">{f.codFotocopiadora}</td>
                           <td>{f.nombre}</td>
                           <td>{f.marca}</td>
                           <td>{f.modelo}</td>
                           <td><code className="text-muted">{f.serie}</code></td>
-                          <td className="text-end">{f.anio}</td>
                           <td>{f.ancho} cm</td>
                           <td>{f.alto} cm</td>
                           <td>{f.fondo} cm</td>
                           <td className="text-center">
-                            <button type="button" className="btn btn-sm btn-outline-danger" title="Quitar" onClick={() => handleRemovePhoto(f.id)}>
+                            <button type="button" className="btn btn-sm btn-outline-danger" title="Quitar" onClick={() => handleRemovePhoto(f.codFotocopiadora)}>
                               <i className="bi bi-trash"></i>
                             </button>
                           </td>
@@ -206,7 +280,7 @@ const RentalForm: React.FC = () => {
                       ))}
                       {selectedPhotos.length === 0 && (
                         <tr>
-                          <td colSpan={10} className="text-center py-4 text-muted">No se han asignado equipos.</td>
+                          <td colSpan={9} className="text-center py-4 text-muted">No se han asignado equipos.</td>
                         </tr>
                       )}
                     </tbody>
@@ -219,8 +293,8 @@ const RentalForm: React.FC = () => {
 
         <div className="d-flex gap-2 mt-3 justify-content-end">
           <Link to="/rentals" className="btn btn-outline-secondary px-4">Cancelar</Link>
-          <button type="submit" className="btn btn-primary px-4" id="btnGuardarAlquiler">
-            <i className="bi bi-save2 me-1"></i>{isEdit ? "Actualizar" : "Registrar Alquiler"}
+          <button type="submit" className="btn btn-primary px-4" id="btnGuardarAlquiler" disabled={submitting}>
+            <i className="bi bi-save2 me-1"></i>{submitting ? 'Guardando...' : isEdit ? 'Actualizar' : 'Registrar Alquiler'}
           </button>
         </div>
       </form>

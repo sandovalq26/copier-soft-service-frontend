@@ -1,19 +1,41 @@
-import React, { useState } from 'react';
+// Erick_Alquileres
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getAllRentals, deleteRental, AlquilerDTO } from '../api/rentalService';
 
 const RentalList: React.FC = () => {
-  // Mock data
-  const rentals = [
-    {
-      id: 'AQ0001', cliDoc: 'DNI: 11112222', cliNom: 'Carlos Lopez',
-      inicio: '2026-06-01', fin: '2026-06-30', periodo: 'MENSUAL', valor: 1, precio: '150.00', estado: 'EN EJECUCION',
-      equipos: [
-        { id: 'F0001', nombre: 'Impresora A', marca: 'Canon', modelo: 'X1', serie: 'SN123', dimensiones: '50x60x50' }
-      ]
-    }
-  ];
+  const [rentals, setRentals] = useState<AlquilerDTO[]>([]);
+  const [selectedRental, setSelectedRental] = useState<AlquilerDTO | null>(null);
+  const [loading, setLoading] = useState(true);
 
-  const [selectedRental, setSelectedRental] = useState<any>(null);
+  const fetchRentals = async () => {
+    try {
+      const data = await getAllRentals();
+      setRentals(data);
+    } catch (err) {
+      console.error('Error al cargar alquileres:', err);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchRentals();
+  }, []);
+
+  const handleDelete = async (id: string) => {
+    if (!window.confirm('¿Estás seguro de eliminar este alquiler?')) return;
+    try {
+      await deleteRental(id);
+      setRentals(prev => prev.filter(r => r.codAlquiler !== id));
+    } catch (err) {
+      console.error('Error al eliminar alquiler:', err);
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center py-5"><div className="spinner-border" role="status"></div></div>;
+  }
 
   return (
     <>
@@ -59,24 +81,27 @@ const RentalList: React.FC = () => {
                 if (item.estado === "FINALIZADO") statusClass = "bg-success-subtle text-success";
                 else if (item.estado === "EN EJECUCION") statusClass = "bg-secondary-subtle text-secondary";
 
+                const cliDoc = `${item.clienteTipoDocumento}: ${item.clienteNumeroDocumento}`;
+                const cliNom = `${item.clienteNombres} ${item.clienteApellidos}`;
+
                 return (
-                  <tr key={item.id}>
-                    <td className="text-muted fw-medium">{item.id}</td>
+                  <tr key={item.codAlquiler}>
+                    <td className="text-muted fw-medium">{item.codAlquiler}</td>
                     <td>
-                      <p className="mb-0">{item.cliDoc}</p>
-                      <p className="mb-0">{item.cliNom}</p>
+                      <p className="mb-0">{cliDoc}</p>
+                      <p className="mb-0">{cliNom}</p>
                     </td>
-                    <td>{item.inicio}</td>
-                    <td>{item.fin}</td>
+                    <td>{item.fechaInicio}</td>
+                    <td>{item.fechaFin}</td>
                     <td>{item.periodo}</td>
-                    <td className="text-center fw-semibold">{item.valor}</td>
+                    <td className="text-center fw-semibold">{item.valorPeriodo}</td>
                     <td className="text-end fw-semibold">S/ {item.precio}</td>
                     <td>
                       <span className={`badge ${statusClass} fw-semibold`}>{item.estado}</span>
                     </td>
                     <td className="text-center">
-                      <button 
-                        type="button" 
+                      <button
+                        type="button"
                         className="btn btn-link btn-sm text-decoration-none"
                         data-bs-toggle="modal"
                         data-bs-target="#fotosModal"
@@ -86,16 +111,26 @@ const RentalList: React.FC = () => {
                       </button>
                     </td>
                     <td className="text-center">
-                      <Link to={`/rentals/edit/${item.id}`} className="btn btn-sm btn-outline-primary me-1" title="Editar">
+                      <Link to={`/rentals/edit/${item.codAlquiler}`} className="btn btn-sm btn-outline-primary me-1" title="Editar">
                         <i className="bi bi-pencil"></i>
                       </Link>
-                      <button className="btn btn-sm btn-outline-danger btn-eliminar" title="Eliminar" disabled={item.estado === "FINALIZADO"}>
+                      <button
+                        className="btn btn-sm btn-outline-danger btn-eliminar"
+                        title="Eliminar"
+                        disabled={item.estado === "FINALIZADO"}
+                        onClick={() => handleDelete(item.codAlquiler)}
+                      >
                         <i className="bi bi-trash"></i>
                       </button>
                     </td>
                   </tr>
                 );
               })}
+              {rentals.length === 0 && (
+                <tr>
+                  <td colSpan={10} className="text-center py-4 text-muted">No hay alquileres registrados.</td>
+                </tr>
+              )}
             </tbody>
           </table>
         </div>
@@ -112,7 +147,7 @@ const RentalList: React.FC = () => {
               <button type="button" className="btn-close btn-close-white" data-bs-dismiss="modal" aria-label="Close"></button>
             </div>
             <div className="modal-body" id="fotosModalBody">
-              {!selectedRental || selectedRental.equipos.length === 0 ? (
+              {!selectedRental || selectedRental.fotocopiadoras.length === 0 ? (
                 <div className="p-4 text-center text-muted">
                   <i className="bi bi-info-circle fs-2 d-block mb-2"></i>
                   Este contrato no tiene fotocopiadoras asignadas.
@@ -130,9 +165,9 @@ const RentalList: React.FC = () => {
                       </tr>
                     </thead>
                     <tbody>
-                      {selectedRental.equipos.map((f: any) => (
-                        <tr key={f.id}>
-                          <td className="fw-bold text-primary">{f.id}</td>
+                      {selectedRental.fotocopiadoras.map((f) => (
+                        <tr key={f.codFotocopiadora}>
+                          <td className="fw-bold text-primary">{f.codFotocopiadora}</td>
                           <td>{f.nombre}</td>
                           <td>
                             <span className="d-block fw-semibold">{f.marca}</span>
@@ -140,7 +175,7 @@ const RentalList: React.FC = () => {
                           </td>
                           <td><code className="text-secondary">{f.serie}</code></td>
                           <td className="text-center">
-                            <small className="text-muted">{f.dimensiones} cm</small>
+                            <small className="text-muted">{f.ancho}x{f.alto}x{f.fondo} cm</small>
                           </td>
                         </tr>
                       ))}
