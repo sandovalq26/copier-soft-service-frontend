@@ -1,12 +1,38 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getAllCustomers } from '../api/customerService';
+import type { CustomerDTO } from '../api/customerService';
 
 const CustomerList: React.FC = () => {
-  // Mock data for customers
-  const customers = [
-    { id: 'C0001', tipoDoc: 'DNI', numDoc: '11112222', nombres: 'Carlos', apellidos: 'Lopez', direccion: 'Av. Siempre Viva 123', telefono: '999888777', email: 'carlos@example.com' },
-    { id: 'C0002', tipoDoc: 'RUC', numDoc: '20123456789', nombres: 'Empresa', apellidos: 'SAC', direccion: 'Calle Falsa 456', telefono: '988777666', email: 'contacto@empresa.com' }
-  ];
+  const [customers, setCustomers] = useState<CustomerDTO[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    const fetchCustomers = async () => {
+      try {
+        const data = await getAllCustomers();
+        setCustomers(data);
+      } catch (err: any) {
+        console.error('Error fetching customers:', err);
+        setError('Ocurrió un error al intentar cargar los clientes.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchCustomers();
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -19,6 +45,12 @@ const CustomerList: React.FC = () => {
           <i className="bi bi-plus-lg me-1"></i>Nuevo Cliente
         </Link>
       </div>
+
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
+      )}
 
       <div className="table-card">
         <div className="table-card-header">
@@ -45,20 +77,17 @@ const CustomerList: React.FC = () => {
                 </tr>
               ) : (
                 customers.map((cli) => (
-                  <tr key={cli.id}>
-                    <td className="text-muted fw-medium">{cli.id}</td>
-                    <td>{cli.tipoDoc}: {cli.numDoc}</td>
-                    <td>{cli.nombres} {cli.apellidos}</td>
+                  <tr key={cli.codCliente}>
+                    <td className="text-muted fw-medium">{cli.codCliente}</td>
+                    <td>{cli.tipoDocumento}: {cli.numeroDocumento}</td>
+                    <td><strong>{cli.nombres} {cli.apellidos}</strong></td>
                     <td>{cli.direccion || "-"}</td>
                     <td>{cli.telefono || "-"}</td>
-                    <td>{cli.email || "-"}</td>
+                    <td>{cli.correo || "-"}</td>
                     <td className="text-center">
-                      <Link to={`/customers/edit/${cli.id}`} className="btn btn-sm btn-outline-primary me-1" title="Editar">
+                      <Link to={`/customers/edit/${cli.codCliente}`} className="btn btn-sm btn-outline-primary me-1" title="Editar">
                         <i className="bi bi-pencil"></i>
                       </Link>
-                      <button className="btn btn-sm btn-outline-danger btn-eliminar" title="Eliminar">
-                        <i className="bi bi-trash"></i>
-                      </button>
                     </td>
                   </tr>
                 ))

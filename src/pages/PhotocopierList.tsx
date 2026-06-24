@@ -1,20 +1,65 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
+import { getAllPhotocopiers } from '../api/photocopierService';
+import { getAllWarehouses } from '../api/warehouseService';
+import { getAllSuppliers } from '../api/supplierService';
+import type { PhotocopierDTO } from '../api/photocopierService';
+import type { WarehouseDTO } from '../api/warehouseService';
+import type { SupplierDTO } from '../api/supplierService';
 
 const PhotocopierList: React.FC = () => {
-  // Mock data for photocopiers
-  const photocopiers = [
-    {
-      id: 'F0001', nombre: 'Impresora A', marca: 'Canon', modelo: 'X1', serie: 'SN123',
-      anio: 2023, ancho: 50, alto: 60, fondo: 50, estado: 'DISPONIBLE',
-      almacen: 'Sede Principal', proveedorRuc: '20123456789', proveedorRazon: 'Canon Peru SAC'
-    },
-    {
-      id: 'F0002', nombre: 'Multifuncional B', marca: 'Ricoh', modelo: 'M2', serie: 'SN987',
-      anio: 2022, ancho: 60, alto: 100, fondo: 60, estado: 'ALQUILADO',
-      almacen: 'Sede Sur', proveedorRuc: '20987654321', proveedorRazon: 'Ricoh S.A.'
-    }
-  ];
+  const [photocopiers, setPhotocopiers] = useState<PhotocopierDTO[]>([]);
+  const [warehouses, setWarehouses] = useState<WarehouseDTO[]>([]);
+  const [suppliers, setSuppliers] = useState<SupplierDTO[]>([]);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [error, setError] = useState<string>('');
+
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [photoData, wareData, suppData] = await Promise.all([
+          getAllPhotocopiers(),
+          getAllWarehouses(),
+          getAllSuppliers()
+        ]);
+        setPhotocopiers(photoData);
+        setWarehouses(wareData);
+        setSuppliers(suppData);
+      } catch (err: any) {
+        console.error('Error fetching data:', err);
+        setError('Ocurrió un error al intentar cargar las fotocopiadoras.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchData();
+  }, []);
+
+  const getWarehouseName = (id: string) => {
+    const w = warehouses.find(w => w.codAlmacen === id);
+    return w ? w.nombre : id;
+  };
+
+  const getSupplierName = (id: string) => {
+    const s = suppliers.find(s => s.codProveedor === id);
+    return s ? s.razonSocial : id;
+  };
+
+  const getSupplierDoc = (id: string) => {
+    const s = suppliers.find(s => s.codProveedor === id);
+    return s ? s.rucEmpresa : '';
+  };
+
+  if (loading) {
+    return (
+      <div className="d-flex justify-content-center align-items-center" style={{ height: '50vh' }}>
+        <div className="spinner-border text-primary" role="status">
+          <span className="visually-hidden">Cargando...</span>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <>
@@ -27,6 +72,12 @@ const PhotocopierList: React.FC = () => {
           <i className="bi bi-plus-lg me-1"></i>Nueva Fotocopiadora
         </Link>
       </div>
+
+      {error && (
+        <div className="alert alert-danger" role="alert">
+          {error}
+        </div>
+      )}
 
       <div className="table-card">
         <div className="table-card-header">
@@ -63,13 +114,13 @@ const PhotocopierList: React.FC = () => {
                   else if (item.estado === "MANTENIMIENTO") statusClass = "bg-danger-subtle text-danger";
 
                   return (
-                    <tr key={item.id}>
-                      <td className="text-muted fw-medium">{item.id}</td>
+                    <tr key={item.codFotocopiadora}>
+                      <td className="text-muted fw-medium">{item.codFotocopiadora}</td>
                       <td className="fw-semibold">{item.nombre}</td>
                       <td>{item.marca}</td>
                       <td>{item.modelo}</td>
                       <td><code className="text-muted">{item.serie}</code></td>
-                      <td className="text-center">{item.anio}</td>
+                      <td className="text-center">{item.anioFabricacion}</td>
                       <td className="small">
                         <span className="d-block">An: {item.ancho}</span>
                         <span className="d-block">Al: {item.alto}</span>
@@ -81,14 +132,14 @@ const PhotocopierList: React.FC = () => {
                           {item.estado}
                         </span>
                       </td>
-                      <td className="small text-uppercase">{item.almacen}</td>
+                      <td className="small text-uppercase">{getWarehouseName(item.codAlmacen)}</td>
                       <td>
-                        <p className="mb-0 small fw-medium">{item.proveedorRazon}</p>
-                        <p className="mb-0 x-small text-muted">RUC: {item.proveedorRuc}</p>
+                        <p className="mb-0 small fw-medium">{getSupplierName(item.codProveedor)}</p>
+                        <p className="mb-0 x-small text-muted">RUC: {getSupplierDoc(item.codProveedor)}</p>
                       </td>
                       <td className="text-center">
                         <div className="d-flex justify-content-center gap-1">
-                          <Link to={`/photocopiers/edit/${item.id}`} className="btn btn-sm btn-outline-primary" title="Editar">
+                          <Link to={`/photocopiers/edit/${item.codFotocopiadora}`} className="btn btn-sm btn-outline-primary" title="Editar">
                             <i className="bi bi-pencil"></i>
                           </Link>
                         </div>
