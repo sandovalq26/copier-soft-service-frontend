@@ -13,6 +13,6 @@ export interface ClienteDTO {
 }
 
 export const getAllClients = async (): Promise<ClienteDTO[]> => {
-  const response = await api.get('/clients');
+  const response = await api.get('/customers');
   return response.data;
 };

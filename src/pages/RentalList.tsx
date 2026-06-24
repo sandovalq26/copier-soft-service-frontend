@@ -1,7 +1,7 @@
 // Erick_Alquileres
 import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { getAllRentals, deleteRental, AlquilerDTO } from '../api/rentalService';
+import {getAllRentals, deleteRental, type AlquilerDTO} from '../api/rentalService';
 
 const RentalList: React.FC = () => {
   const [rentals, setRentals] = useState<AlquilerDTO[]>([]);
